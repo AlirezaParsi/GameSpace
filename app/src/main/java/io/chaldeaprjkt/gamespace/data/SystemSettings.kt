@@ -1,107 +1,74 @@
-/*
- * Copyright (C) 2021 Chaldeaprjkt
- *               2022 crDroid Android Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.chaldeaprjkt.gamespace.data
 
 import android.content.Context
-import android.os.UserHandle
-import android.provider.Settings
-import io.chaldeaprjkt.gamespace.utils.GameModeUtils
-import javax.inject.Inject
+import java.io.DataOutputStream
 
-import lineageos.providers.LineageSettings
+class SystemSettings(private val context: Context) {
 
-class SystemSettings @Inject constructor(
-    context: Context,
-    private val gameModeUtils: GameModeUtils
-) {
-
-    private val resolver = context.contentResolver
-
-    var headsup
-        get() = Settings.Global.getInt(
-            resolver, Settings.Global.HEADS_UP_NOTIFICATIONS_ENABLED, 1) == 1
-        set(it) {
-            Settings.Global.putInt(
-                resolver, Settings.Global.HEADS_UP_NOTIFICATIONS_ENABLED,
-                it.toInt()
-            )
+    var autoBrightness: Boolean?
+        get() = try {
+            val result = execCommand("settings get system screen_brightness_mode").trim()
+            result == "1" // 1 = auto, 0 = manual
+        } catch (e: Exception) {
+            null
         }
-
-    var autoBrightness
-        get() =
-            Settings.System.getIntForUser(
-                resolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
-                UserHandle.USER_CURRENT
-            ) ==
-                    Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
-        set(auto) {
-            Settings.System.putIntForUser(
-                resolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE,
-                if (auto) Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
-                else Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-                UserHandle.USER_CURRENT
-            )
-        }
-
-    var threeScreenshot
-        get() = LineageSettings.System.getIntForUser(
-            resolver, LineageSettings.System.KEY_THREE_FINGERS_SWIPE_ACTION, 0,
-            UserHandle.USER_CURRENT
-        )
         set(value) {
-            LineageSettings.System.putIntForUser(
-                resolver, LineageSettings.System.KEY_THREE_FINGERS_SWIPE_ACTION,
-                value, UserHandle.USER_CURRENT
-            )
+            value?.let {
+                execRootCommand("settings put system screen_brightness_mode ${if (it) 1 else 0}")
+            }
         }
 
-    var userGames
-        get() =
-            Settings.System.getStringForUser(
-                resolver, Settings.System.GAMESPACE_GAME_LIST,
-                UserHandle.USER_CURRENT
-            )
-                ?.split(";")
-                ?.toList()?.filter { it.isNotEmpty() }
-                ?.map { UserGame.fromSettings(it) } ?: emptyList()
-        set(games) {
-            Settings.System.putStringForUser(
-                resolver,
-                Settings.System.GAMESPACE_GAME_LIST,
-                if (games.isEmpty()) "" else
-                    games.joinToString(";") { it.toString() },
-                UserHandle.USER_CURRENT
-            )
-            gameModeUtils.setupBatteryMode(games.isNotEmpty())
+    var headsup: Boolean?
+        get() = try {
+            val result = execCommand("settings get secure heads_up_notifications_enabled").trim()
+            result == "1"
+        } catch (e: Exception) {
+            null
+        }
+        set(value) {
+            value?.let {
+                execRootCommand("settings put secure heads_up_notifications_enabled ${if (it) 1 else 0}")
+            }
         }
 
-    var adbEnabled
-        get() = Settings.Global.getInt(
-            resolver, Settings.Global.ADB_ENABLED, 0
-        ) == 1
-        set(it) {
-            Settings.Global.putInt(
-                resolver, Settings.Global.ADB_ENABLED,
-                it.toInt()
-            )
+    var threeScreenshot: Int
+        get() = try {
+            execCommand("settings get system three_finger_gesture").trim().toIntOrNull() ?: 0
+        } catch (e: Exception) {
+            0
+        }
+        set(value) {
+            execRootCommand("settings put system three_finger_gesture $value")
         }
 
-    private fun Boolean.toInt() = if (this) 1 else 0
+    var adbEnabled: Boolean?
+        get() = try {
+            val result = execCommand("settings get global adb_enabled").trim()
+            result == "1"
+        } catch (e: Exception) {
+            null
+        }
+        set(value) {
+            value?.let {
+                execRootCommand("settings put global adb_enabled ${if (it) 1 else 0}")
+            }
+        }
+
+    private fun execCommand(command: String): String {
+        val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+        return process.inputStream.bufferedReader().use { it.readText() }
+    }
+
+    private fun execRootCommand(command: String) {
+        try {
+            val process = Runtime.getRuntime().exec("su")
+            val output = DataOutputStream(process.outputStream)
+            output.writeBytes("$command\n")
+            output.writeBytes("exit\n")
+            output.flush()
+            process.waitFor()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }
