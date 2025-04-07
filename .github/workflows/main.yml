@@ -1,4 +1,4 @@
-name: Build Android Project
+name: Build GameSpace APK
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up JDK (Java Development Kit)
+      # Step 2: Set up JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -45,11 +45,11 @@ jobs:
 
       # Step 6: Build the project
       - name: Build with Gradle
-        run: ./gradlew clean assembleRelease
+        run: ./gradlew clean assembleRelease --stacktrace
 
       # Step 7: Upload APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: gamespace-release-apk
           path: app/build/outputs/apk/release/app-release.apk
