@@ -30,7 +30,7 @@
             android:defaultValue="3"
             android:entries="@array/ringer_mode_entries"
             android:entryValues="@array/ringer_mode_values"
-            android:key="gamespace :)
+            android:key="gamespace_ringer_mode"  <!-- Fixed key -->
             android:summary="%s"
             android:title="@string/ringer_mode_title" />
     </PreferenceCategory>
